@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import folium
-from streamlit_folium import folium_static
 
 # Configurar o app
 st.title("Visualização de Resíduos por Estado e Unidade de Tratamento")
@@ -41,43 +39,34 @@ if uploaded_file:
         fig = px.bar(df_melted, x="Resíduo", y="Quantidade", color="UF", barmode="group",
                      title="Comparação de Resíduos entre Estados")
         st.plotly_chart(fig)
-        
-        # Mapa Interativo
-        st.write("### Distribuição Geográfica dos Resíduos")
-        mapa = folium.Map(location=[-15.78, -47.93], zoom_start=4)
-        for _, row in df_filtered.iterrows():
-            folium.Marker(
-                location=[-15.78, -47.93],
-                popup=f"{row['UF']}: {row[residuos_cols].sum():.2f} toneladas",
-                icon=folium.Icon(color="blue")
-            ).add_to(mapa)
-        folium_static(mapa)
     
-    # Comparação entre Unidades de Tratamento
+    # Comparação entre Unidades de Tratamento por Tipo
     elif len(unidades) > 1:
         residuos_cols = df_filtered.columns[2:]
         df_melted = df_filtered.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-        fig = px.bar(df_melted, x="Resíduo", y="Quantidade", color="Unidade", barmode="group",
-                     title="Fluxo de Resíduos por Unidade de Tratamento")
-        st.plotly_chart(fig)
+        unidade_tipos = df_filtered["Unidade"].unique()
+        
+        for unidade in unidade_tipos:
+            df_unidade = df_melted[df_melted["Unidade"] == unidade]
+            fig = px.bar(df_unidade, x="Resíduo", y="Quantidade", color="UF", barmode="group",
+                         title=f"Fluxo de Resíduos para {unidade}")
+            st.plotly_chart(fig)
     
-    # Heatmap dos Resíduos por Estado
-    st.write("### Distribuição dos Resíduos por Estado")
-    residuos_sum = df_filtered.groupby("UF")[residuos_cols].sum()
-    fig_heatmap = go.Figure(data=go.Heatmap(
-        z=residuos_sum.values,
-        x=residuos_sum.columns,
-        y=residuos_sum.index,
-        colorscale="Viridis"
-    ))
-    fig_heatmap.update_layout(title="Heatmap dos Resíduos por Estado", xaxis_title="Tipo de Resíduo", yaxis_title="Estados")
-    st.plotly_chart(fig_heatmap)
+    # TreeMap dos Resíduos por Estado
+    st.write("### Proporção de Resíduos por Estado")
+    for estado in df_filtered["UF"].unique():
+        df_estado = df_filtered[df_filtered["UF"] == estado]
+        df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+        fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos em {estado}")
+        st.plotly_chart(fig_treemap)
     
-    # TreeMap dos Resíduos
-    st.write("### Proporção de Resíduos")
-    df_melted = df_filtered.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-    fig_treemap = px.treemap(df_melted, path=["UF", "Resíduo"], values="Quantidade", title="TreeMap dos Resíduos")
-    st.plotly_chart(fig_treemap)
+    # TreeMap dos Resíduos por Unidade de Tratamento
+    st.write("### Proporção de Resíduos por Unidade de Tratamento")
+    for unidade in df_filtered["Unidade"].unique():
+        df_unidade = df_filtered[df_filtered["Unidade"] == unidade]
+        df_melted = df_unidade.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+        fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos na Unidade {unidade}")
+        st.plotly_chart(fig_treemap)
     
 else:
     st.write("Por favor, carregue um arquivo Excel para começar.")
