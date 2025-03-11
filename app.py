@@ -25,7 +25,7 @@ if uploaded_file:
     
     with tab1:
         # Filtrar os dados conforme seleção do usuário
-        df_filtered = df.copy()
+        df_filtered = df[["UF", "Unidade"] + residuos_cols].copy()
         if estados:
             df_filtered = df_filtered[df_filtered["UF"].isin(estados)]
         if unidades:
@@ -36,9 +36,6 @@ if uploaded_file:
         col1, col2 = st.columns(2)
         col1.metric("Total de Estados", len(df_filtered["UF"].unique()))
         col2.metric("Total de Unidades de Tratamento", len(df_filtered["Unidade"].unique()))
-        
-        # Exibir dados filtrados
-        st.write("### Dados Filtrados", df_filtered)
         
         # Comparação entre Estados
         if len(estados) > 1:
@@ -67,7 +64,7 @@ if uploaded_file:
             df_estado = df_filtered[df_filtered["UF"] == estado]
             df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
             fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos em {estado}")
-            st.plotly_chart(fig)
+            st.plotly_chart(fig_treemap)
         
         # TreeMap dos Resíduos por Unidade de Tratamento dentro de cada Estado
         st.write("### Proporção de Resíduos por Unidade de Tratamento dentro de cada Estado")
@@ -83,11 +80,11 @@ if uploaded_file:
         st.write("### Classificações Especiais")
         for coluna in colunas_extras:
             if coluna in df.columns:
-                df_classificacao = df[["UF", "Unidade", coluna]].copy()
+                df_classificacao = df[["UF", "Unidade", coluna]].dropna().copy()
                 df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
                 fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
                                            title=f"{coluna} por Estado e Unidade de Tratamento")
-                st.plotly_chart(fig_classificacao)
+                st.plotly_chart(fig_classificacao, key=coluna)
     
 else:
     st.write("Por favor, carregue um arquivo Excel para começar.")
