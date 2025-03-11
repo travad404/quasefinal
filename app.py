@@ -45,14 +45,11 @@ if uploaded_file:
             st.plotly_chart(fig)
         
         # Comparação entre Unidades de Tratamento por Tipo dentro de cada Estado
-        if len(estados) > 1 and len(unidades) > 1:
+        if len(estados) > 1:
             for estado in estados:
                 df_estado = df_filtered[df_filtered["UF"] == estado]
                 df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-                unidade_tipos = df_estado["Unidade"].unique()
-                
-                st.write(f"### Comparação entre Unidades de Tratamento em {estado}")
-                for unidade in unidade_tipos:
+                for unidade in df_estado["Unidade"].unique():
                     df_unidade = df_melted[df_melted["Unidade"] == unidade]
                     fig = px.bar(df_unidade, x="Resíduo", y="Quantidade", color="UF", barmode="group",
                                  title=f"Fluxo de Resíduos para {unidade} em {estado}")
@@ -65,26 +62,20 @@ if uploaded_file:
             df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
             fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos em {estado}")
             st.plotly_chart(fig_treemap)
-        
-        # TreeMap dos Resíduos por Unidade de Tratamento dentro de cada Estado
-        st.write("### Proporção de Resíduos por Unidade de Tratamento dentro de cada Estado")
-        for estado in df_filtered["UF"].unique():
-            df_estado = df_filtered[df_filtered["UF"] == estado]
-            for unidade in df_estado["Unidade"].unique():
-                df_unidade = df_estado[df_estado["Unidade"] == unidade]
-                df_melted = df_unidade.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-                fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos na Unidade {unidade} em {estado}")
-                st.plotly_chart(fig_treemap)
     
     with tab2:
         st.write("### Classificações Especiais")
+        df_filtered_class = df[["UF", "Unidade"] + colunas_extras].copy()
+        if estados:
+            df_filtered_class = df_filtered_class[df_filtered_class["UF"].isin(estados)]
+        if unidades:
+            df_filtered_class = df_filtered_class[df_filtered_class["Unidade"].isin(unidades)]
+        
         for coluna in colunas_extras:
-            if coluna in df.columns:
-                df_classificacao = df[["UF", "Unidade", coluna]].dropna().copy()
-                df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
-                fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
-                                           title=f"{coluna} por Estado e Unidade de Tratamento")
-                st.plotly_chart(fig_classificacao, key=coluna)
-    
+            df_classificacao = df_filtered_class[["UF", "Unidade", coluna]].dropna().copy()
+            df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
+            fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
+                                       title=f"{coluna} por Estado e Unidade de Tratamento")
+            st.plotly_chart(fig_classificacao, key=coluna)
 else:
     st.write("Por favor, carregue um arquivo Excel para começar.")
