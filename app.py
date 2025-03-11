@@ -18,7 +18,8 @@ if uploaded_file:
     
     # Separar classificações especiais
     colunas_extras = ["Redução Peso Líquido", "Redução Peso Seco", "Valor energético (Mj/ton)", "Outros", "Outros processados"]
-    residuos_cols = [col for col in df.columns if col not in colunas_extras and col not in ["UF", "Unidade"]]
+    colunas_extras_presentes = [col for col in colunas_extras if col in df.columns]
+    residuos_cols = [col for col in df.columns if col not in colunas_extras_presentes and col not in ["UF", "Unidade"]]
     
     # Criar tabs
     tab1, tab2 = st.tabs(["Resíduos Gerais", "Classificações Especiais"])
@@ -65,17 +66,20 @@ if uploaded_file:
     
     with tab2:
         st.write("### Classificações Especiais")
-        df_filtered_class = df[["UF", "Unidade"] + colunas_extras].copy()
-        if estados:
-            df_filtered_class = df_filtered_class[df_filtered_class["UF"].isin(estados)]
-        if unidades:
-            df_filtered_class = df_filtered_class[df_filtered_class["Unidade"].isin(unidades)]
-        
-        for coluna in colunas_extras:
-            df_classificacao = df_filtered_class[["UF", "Unidade", coluna]].dropna().copy()
-            df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
-            fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
-                                       title=f"{coluna} por Estado e Unidade de Tratamento")
-            st.plotly_chart(fig_classificacao, key=coluna)
+        if colunas_extras_presentes:
+            df_filtered_class = df[["UF", "Unidade"] + colunas_extras_presentes].copy()
+            if estados:
+                df_filtered_class = df_filtered_class[df_filtered_class["UF"].isin(estados)]
+            if unidades:
+                df_filtered_class = df_filtered_class[df_filtered_class["Unidade"].isin(unidades)]
+            
+            for coluna in colunas_extras_presentes:
+                df_classificacao = df_filtered_class[["UF", "Unidade", coluna]].dropna().copy()
+                df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
+                fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
+                                           title=f"{coluna} por Estado e Unidade de Tratamento")
+                st.plotly_chart(fig_classificacao, key=coluna)
+        else:
+            st.write("Nenhuma das classificações especiais foi encontrada na planilha carregada.")
 else:
     st.write("Por favor, carregue um arquivo Excel para começar.")
