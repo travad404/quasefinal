@@ -16,57 +16,78 @@ if uploaded_file:
     estados = st.multiselect("Selecione os estados", df["UF"].unique())
     unidades = st.multiselect("Selecione as unidades de tratamento", df["Unidade"].unique())
     
-    # Filtrar os dados conforme seleção do usuário
-    df_filtered = df.copy()
-    if estados:
-        df_filtered = df_filtered[df_filtered["UF"].isin(estados)]
-    if unidades:
-        df_filtered = df_filtered[df_filtered["Unidade"].isin(unidades)]
+    # Separar classificações especiais
+    colunas_extras = ["Redução Peso Líquido", "Redução Peso Seco", "Valor energético (Mj/ton)", "Outros", "Outros processados"]
+    residuos_cols = [col for col in df.columns if col not in colunas_extras and col not in ["UF", "Unidade"]]
     
-    # Exibir KPIs
-    st.write("### Visão Geral")
-    col1, col2 = st.columns(2)
-    col1.metric("Total de Estados", len(df_filtered["UF"].unique()))
-    col2.metric("Total de Unidades de Tratamento", len(df_filtered["Unidade"].unique()))
+    # Criar tabs
+    tab1, tab2 = st.tabs(["Resíduos Gerais", "Classificações Especiais"])
     
-    # Exibir dados filtrados
-    st.write("### Dados Filtrados", df_filtered)
-    
-    # Comparação entre Estados
-    if len(estados) > 1:
-        residuos_cols = df_filtered.columns[2:]
-        df_melted = df_filtered.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-        fig = px.bar(df_melted, x="Resíduo", y="Quantidade", color="UF", barmode="group",
-                     title="Comparação de Resíduos entre Estados")
-        st.plotly_chart(fig)
-    
-    # Comparação entre Unidades de Tratamento por Tipo
-    elif len(unidades) > 1:
-        residuos_cols = df_filtered.columns[2:]
-        df_melted = df_filtered.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-        unidade_tipos = df_filtered["Unidade"].unique()
+    with tab1:
+        # Filtrar os dados conforme seleção do usuário
+        df_filtered = df.copy()
+        if estados:
+            df_filtered = df_filtered[df_filtered["UF"].isin(estados)]
+        if unidades:
+            df_filtered = df_filtered[df_filtered["Unidade"].isin(unidades)]
         
-        for unidade in unidade_tipos:
-            df_unidade = df_melted[df_melted["Unidade"] == unidade]
-            fig = px.bar(df_unidade, x="Resíduo", y="Quantidade", color="UF", barmode="group",
-                         title=f"Fluxo de Resíduos para {unidade}")
+        # Exibir KPIs
+        st.write("### Visão Geral")
+        col1, col2 = st.columns(2)
+        col1.metric("Total de Estados", len(df_filtered["UF"].unique()))
+        col2.metric("Total de Unidades de Tratamento", len(df_filtered["Unidade"].unique()))
+        
+        # Exibir dados filtrados
+        st.write("### Dados Filtrados", df_filtered)
+        
+        # Comparação entre Estados
+        if len(estados) > 1:
+            df_melted = df_filtered.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+            fig = px.bar(df_melted, x="Resíduo", y="Quantidade", color="UF", barmode="group",
+                         title="Comparação de Resíduos entre Estados")
             st.plotly_chart(fig)
+        
+        # Comparação entre Unidades de Tratamento por Tipo dentro de cada Estado
+        if len(estados) > 1 and len(unidades) > 1:
+            for estado in estados:
+                df_estado = df_filtered[df_filtered["UF"] == estado]
+                df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+                unidade_tipos = df_estado["Unidade"].unique()
+                
+                st.write(f"### Comparação entre Unidades de Tratamento em {estado}")
+                for unidade in unidade_tipos:
+                    df_unidade = df_melted[df_melted["Unidade"] == unidade]
+                    fig = px.bar(df_unidade, x="Resíduo", y="Quantidade", color="UF", barmode="group",
+                                 title=f"Fluxo de Resíduos para {unidade} em {estado}")
+                    st.plotly_chart(fig)
+        
+        # TreeMap dos Resíduos por Estado individualmente
+        st.write("### Proporção de Resíduos por Estado")
+        for estado in df_filtered["UF"].unique():
+            df_estado = df_filtered[df_filtered["UF"] == estado]
+            df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+            fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos em {estado}")
+            st.plotly_chart(fig)
+        
+        # TreeMap dos Resíduos por Unidade de Tratamento dentro de cada Estado
+        st.write("### Proporção de Resíduos por Unidade de Tratamento dentro de cada Estado")
+        for estado in df_filtered["UF"].unique():
+            df_estado = df_filtered[df_filtered["UF"] == estado]
+            for unidade in df_estado["Unidade"].unique():
+                df_unidade = df_estado[df_estado["Unidade"] == unidade]
+                df_melted = df_unidade.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
+                fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos na Unidade {unidade} em {estado}")
+                st.plotly_chart(fig_treemap)
     
-    # TreeMap dos Resíduos por Estado
-    st.write("### Proporção de Resíduos por Estado")
-    for estado in df_filtered["UF"].unique():
-        df_estado = df_filtered[df_filtered["UF"] == estado]
-        df_melted = df_estado.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-        fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos em {estado}")
-        st.plotly_chart(fig_treemap)
-    
-    # TreeMap dos Resíduos por Unidade de Tratamento
-    st.write("### Proporção de Resíduos por Unidade de Tratamento")
-    for unidade in df_filtered["Unidade"].unique():
-        df_unidade = df_filtered[df_filtered["Unidade"] == unidade]
-        df_melted = df_unidade.melt(id_vars=["UF", "Unidade"], value_vars=residuos_cols, var_name="Resíduo", value_name="Quantidade")
-        fig_treemap = px.treemap(df_melted, path=["Resíduo"], values="Quantidade", title=f"TreeMap dos Resíduos na Unidade {unidade}")
-        st.plotly_chart(fig_treemap)
+    with tab2:
+        st.write("### Classificações Especiais")
+        for coluna in colunas_extras:
+            if coluna in df.columns:
+                df_classificacao = df[["UF", "Unidade", coluna]].copy()
+                df_melted = df_classificacao.melt(id_vars=["UF", "Unidade"], value_vars=[coluna], var_name="Classificação", value_name="Valor")
+                fig_classificacao = px.bar(df_melted, x="UF", y="Valor", color="Unidade", barmode="group",
+                                           title=f"{coluna} por Estado e Unidade de Tratamento")
+                st.plotly_chart(fig_classificacao)
     
 else:
     st.write("Por favor, carregue um arquivo Excel para começar.")
